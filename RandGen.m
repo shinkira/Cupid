@@ -156,6 +156,57 @@ classdef RandGen < handle
             end
             FindRhoLimits(obj);
             obj.RhoControllers = zeros(obj.NRVs);
+            % optimize this part by computing only for unique combination of [rho, r_lo, r_hi]
+            k = 1;
+            for i = 1:obj.NRVs
+                r(i) = obj.RVs{i}.mu;
+            end
+            for i = 1:obj.NRVs-1
+                for j = i+1:obj.NRVs
+                    S(k,:) = [obj.TargetCorrs(i,j),r(i),r(j)];
+                    ind(k,:) = [i,j];
+                    k = k+1;
+                end
+            end
+            
+            [C,IA,IC] = unique(S,'rows'); % find unique combinations of [rho, r_lo, r_hi]
+            n_unique = size(C,1);
+            
+            for i = 1:n_unique
+                iRV = obj.RVs{ind(IA(i),1)};
+                jRV = obj.RVs{ind(IA(i),2)};
+                % fill cell pairs with the same combination
+                % temp = Find1RhoController(obj,iRV,jRV);
+                pick_ind = find(IC==i);
+                for j = 1:length(pick_ind)
+                    iRV = ind(pick_ind(j),1);
+                    jRV = ind(pick_ind(j),2);
+                    if j==1
+                        temp = Find1RhoController(obj,iRV,jRV);
+                    end
+                    obj.RhoControllers(iRV,jRV) = temp;
+                end
+            end
+                        
+            % copy upper triangular into lower triangular & add ones on diagonal:
+            obj.RhoControllers = obj.RhoControllers + triu(obj.RhoControllers,1)' + eye(obj.NRVs);
+        end
+        
+        function FindRhoControllerMatrix_original(obj)
+            % Find the matrix of pairwise RhoController values to obtain the desired TargetCorrs
+            % among an arbitrary set of RVs.
+            % RVs is a cell array of the random variables.
+            % TargetCorrs is an upper-diagonal matrix of the desired correlations.
+            % RhoControllerMatrix is an upper-diagonal matrix of the RhoController values
+            % required to obtain the desired correlations.
+            obj.Pctiles = (1:2:2*obj.NSteps-1) / (2*obj.NSteps);
+            obj.ZPctiles = norminv(obj.Pctiles);
+            obj.RVPctiles = zeros(obj.NRVs,obj.NSteps);
+            for iRV = 1:obj.NRVs
+                obj.RVPctiles(iRV,:) = obj.RVs{iRV}.InverseCDF(obj.Pctiles);
+            end
+            FindRhoLimits(obj);
+            obj.RhoControllers = zeros(obj.NRVs);
             for iRV = 1:obj.NRVs-1
                 for jRV = iRV+1:obj.NRVs
                     obj.RhoControllers(iRV,jRV) = Find1RhoController(obj,iRV,jRV);
