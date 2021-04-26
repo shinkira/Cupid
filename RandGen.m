@@ -158,8 +158,15 @@ classdef RandGen < handle
             obj.RhoControllers = zeros(obj.NRVs);
             % optimize this part by computing only for unique combination of [rho, r_lo, r_hi]
             k = 1;
-            for i = 1:obj.NRVs
-                r(i) = obj.RVs{i}.mu;
+            switch obj.RVs{1}.FamilyName
+                case 'Poisson'
+                    for i = 1:obj.NRVs
+                        r(i) = obj.RVs{i}.mu;
+                    end
+                case 'Gamma'
+                    for i = 1:obj.NRVs
+                        r(i) = obj.RVs{i}.N;
+                    end
             end
             for i = 1:obj.NRVs-1
                 for j = i+1:obj.NRVs
